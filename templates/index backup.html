@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>ProteinAI — Secondary Structure Predictor</title>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet"/>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:      #040810;
+      --surface: #080f1e;
+      --surface2:#0d1a30;
+      --border:  #142238;
+      --helix:   #00e5ff;
+      --sheet:   #69ff8a;
+      --coil:    #ff6b35;
+      --accent:  #00e5ff;
+      --text:    #c8dff5;
+      --muted:   #3d6080;
+      --font-h:  'Syne', sans-serif;
+      --font-m:  'JetBrains Mono', monospace;
+    }
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--bg); color: var(--text);
+      font-family: var(--font-h); min-height: 100vh; overflow-x: hidden;
+    }
+    body::before {
+      content:''; position:fixed; inset:0; z-index:0;
+      background-image:
+        linear-gradient(rgba(0,229,255,0.025) 1px,transparent 1px),
+        linear-gradient(90deg,rgba(0,229,255,0.025) 1px,transparent 1px);
+      background-size:48px 48px; pointer-events:none;
+    }
+    .wrapper { position:relative; z-index:1; max-width:1100px; margin:0 auto; padding:0 28px 100px; }
+
+    /* Header */
+    header { padding:56px 0 36px; }
+    .badge { font-family:var(--font-m); font-size:10px; letter-spacing:3px; color:var(--accent); border:1px solid rgba(0,229,255,0.3); padding:5px 12px; display:inline-block; margin-bottom:22px; }
+    h1 { font-size:clamp(2.4rem,6vw,4.2rem); font-weight:800; line-height:1.04; letter-spacing:-1.5px; }
+    h1 em { color:var(--accent); font-style:normal; }
+    .subtitle { margin-top:16px; font-family:var(--font-m); font-size:.9rem; color:var(--muted); line-height:1.7; max-width:580px; }
+    .legend { display:flex; gap:28px; flex-wrap:wrap; margin-top:28px; }
+    .leg { display:flex; align-items:center; gap:9px; font-family:var(--font-m); font-size:12px; color:var(--muted); }
+    .leg-dot { width:10px; height:10px; border-radius:50%; }
+
+    /* Input */
+    .card { background:var(--surface); border:1px solid var(--border); padding:28px 30px; margin-top:44px; }
+    .card-lbl { font-family:var(--font-m); font-size:10px; letter-spacing:2.5px; color:var(--muted); text-transform:uppercase; margin-bottom:14px; }
+    textarea { width:100%; background:var(--bg); border:1px solid var(--border); color:var(--accent); font-family:var(--font-m); font-size:14px; padding:16px; resize:vertical; min-height:108px; outline:none; letter-spacing:1px; line-height:1.85; transition:border-color .2s; }
+    textarea::placeholder { color:var(--muted); opacity:.5; }
+    textarea:focus { border-color:var(--accent); }
+    .row { display:flex; gap:12px; margin-top:14px; flex-wrap:wrap; }
+    .btn { font-family:var(--font-h); font-size:13px; font-weight:700; letter-spacing:1.2px; padding:13px 30px; border:none; cursor:pointer; text-transform:uppercase; transition:all .15s; }
+    .btn-p { background:var(--accent); color:var(--bg); }
+    .btn-p:hover { filter:brightness(1.15); transform:translateY(-1px); }
+    .btn-p:disabled { opacity:.4; cursor:not-allowed; transform:none; }
+    .btn-s { background:transparent; color:var(--muted); border:1px solid var(--border); }
+    .btn-s:hover { border-color:var(--accent); color:var(--accent); }
+    .chips { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:13px; }
+    .chips-lbl { font-family:var(--font-m); font-size:11px; color:var(--muted); }
+    .chip { font-family:var(--font-m); font-size:11px; background:transparent; border:1px solid var(--border); color:var(--muted); padding:4px 11px; cursor:pointer; transition:all .15s; }
+    .chip:hover { border-color:var(--accent); color:var(--accent); }
+    .status { margin-top:16px; font-family:var(--font-m); font-size:13px; min-height:20px; }
+    .status.loading { color:var(--accent); }
+    .status.error   { color:var(--coil); }
+    .status.demo    { color:var(--sheet); }
+
+    /* Results */
+    #results { margin-top:48px; display:none; }
+    .sec-title { font-family:var(--font-m); font-size:10px; letter-spacing:2.5px; text-transform:uppercase; color:var(--muted); margin-bottom:14px; }
+    .stats-row { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:28px; }
+    @media(max-width:700px){ .stats-row { grid-template-columns:1fr 1fr; } }
+    .stat { background:var(--surface); border:1px solid var(--border); padding:20px 20px 16px; }
+    .stat-lbl { font-family:var(--font-m); font-size:10px; letter-spacing:1.5px; color:var(--muted); text-transform:uppercase; }
+    .stat-val { font-size:2.4rem; font-weight:800; margin-top:6px; letter-spacing:-1px; line-height:1; }
+    .stat-val.h { color:var(--helix); text-shadow:0 0 24px rgba(0,229,255,.4); }
+    .stat-val.e { color:var(--sheet); text-shadow:0 0 24px rgba(105,255,138,.4); }
+    .stat-val.c { color:var(--coil);  text-shadow:0 0 24px rgba(255,107,53,.4); }
+    .stat-sub { font-family:var(--font-m); font-size:11px; color:var(--muted); margin-top:5px; }
+    .seq-card { background:var(--surface); border:1px solid var(--border); padding:20px; margin-bottom:28px; overflow-x:auto; }
+    .seq-row { display:flex; flex-wrap:wrap; gap:2px; }
+    .res { display:inline-flex; flex-direction:column; align-items:center; gap:3px; padding:5px 5px; cursor:pointer; transition:transform .1s; }
+    .res:hover { transform:translateY(-3px); z-index:5; }
+    .res-aa { font-family:var(--font-m); font-weight:600; font-size:12px; line-height:1; }
+    .res-ss { font-family:var(--font-m); font-size:9px; line-height:1; opacity:.75; }
+    .res.H { background:rgba(0,229,255,.1); color:var(--helix); }
+    .res.E { background:rgba(105,255,138,.1); color:var(--sheet); }
+    .res.C { background:rgba(255,107,53,.1);  color:var(--coil); }
+
+    /* 3D Viewer */
+    .viewer-section { margin-bottom:28px; }
+    .viewer-header { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom:14px; }
+    .viewer-controls { display:flex; gap:8px; flex-wrap:wrap; }
+    .vbtn { font-family:var(--font-m); font-size:11px; letter-spacing:1px; padding:6px 14px; cursor:pointer; background:transparent; border:1px solid var(--border); color:var(--muted); transition:all .15s; text-transform:uppercase; }
+    .vbtn:hover,.vbtn.active { border-color:var(--accent); color:var(--accent); background:rgba(0,229,255,.06); }
+    .vbtn.active { box-shadow:0 0 12px rgba(0,229,255,.2); }
+    .viewer-wrap { position:relative; background:var(--surface); border:1px solid var(--border); overflow:hidden; }
+    #threeCanvas { display:block; width:100% !important; height:500px !important; cursor:grab; }
+    #threeCanvas:active { cursor:grabbing; }
+    .viewer-overlay { position:absolute; bottom:16px; left:16px; font-family:var(--font-m); font-size:11px; color:var(--muted); pointer-events:none; line-height:1.8; }
+    .viewer-tooltip { position:absolute; background:var(--surface2); border:1px solid var(--border); padding:10px 14px; font-family:var(--font-m); font-size:12px; pointer-events:none; display:none; z-index:20; min-width:200px; }
+    .tt-row { display:flex; justify-content:space-between; gap:24px; margin-bottom:3px; }
+    .tt-key { color:var(--muted); }
+    .tt-val { font-weight:600; }
+    .tt-val.H { color:var(--helix); }
+    .tt-val.E { color:var(--sheet); }
+    .tt-val.C { color:var(--coil); }
+    .legend-3d { display:flex; gap:20px; flex-wrap:wrap; margin-top:12px; font-family:var(--font-m); font-size:11px; }
+    .l3d { display:flex; align-items:center; gap:7px; color:var(--muted); }
+    .l3d-swatch { width:28px; height:8px; border-radius:2px; }
+
+    /* Charts */
+    .chart-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:28px; }
+    @media(max-width:640px){ .chart-grid { grid-template-columns:1fr; } }
+    .chart-card { background:var(--surface); border:1px solid var(--border); padding:20px; }
+    .chart-card canvas { max-height:220px; }
+    .conf-card { background:var(--surface); border:1px solid var(--border); padding:20px; margin-bottom:28px; }
+    .conf-card canvas { max-height:170px; }
+
+    /* Table */
+    .tbl-wrap { background:var(--surface); border:1px solid var(--border); overflow:hidden; margin-bottom:28px; }
+    table { width:100%; border-collapse:collapse; font-family:var(--font-m); font-size:12px; }
+    thead th { background:rgba(0,229,255,.05); color:var(--muted); text-transform:uppercase; letter-spacing:1px; font-size:10px; padding:10px 14px; text-align:left; border-bottom:1px solid var(--border); }
+    tbody tr { border-bottom:1px solid rgba(20,34,56,.6); }
+    tbody tr:last-child { border-bottom:none; }
+    tbody tr:hover { background:rgba(0,229,255,.025); }
+    tbody td { padding:8px 14px; }
+    .tag { display:inline-block; padding:2px 9px; font-size:10px; font-weight:700; letter-spacing:1px; }
+    .tag.H { background:rgba(0,229,255,.12); color:var(--helix); }
+    .tag.E { background:rgba(105,255,138,.12); color:var(--sheet); }
+    .tag.C { background:rgba(255,107,53,.12);  color:var(--coil); }
+    .cbar-wrap { display:flex; align-items:center; gap:8px; }
+    .cbar { flex:1; height:4px; background:var(--bg); max-width:90px; }
+    .cbar-fill { height:100%; }
+    .cbar-fill.H { background:var(--helix); }
+    .cbar-fill.E { background:var(--sheet); }
+    .cbar-fill.C { background:var(--coil); }
+
+    footer { margin-top:60px; border-top:1px solid var(--border); padding-top:24px; font-family:var(--font-m); font-size:11px; color:var(--muted); display:flex; justify-content:space-between; flex-wrap:wrap; gap:12px; }
+
+    @keyframes spin { to { transform:rotate(360deg); } }
+    .spinner { display:inline-block; width:12px; height:12px; border:2px solid rgba(0,229,255,.25); border-top-color:var(--accent); border-radius:50%; animation:spin .7s linear infinite; vertical-align:middle; margin-right:6px; }
+    @keyframes fadeUp { from{opacity:0;transform:translateY(18px)} to{opacity:1;transform:translateY(0)} }
+    .fade-in { animation:fadeUp .5s ease forwards; }
+  </style>
+</head>
+<body>
+<div class="wrapper">
+
+  <header>
+    <div class="badge">AI · BIOINFORMATICS · DEEP LEARNING</div>
+    <h1>Protein<em>AI</em><br/>Structure Predictor</h1>
+    <p class="subtitle">Input an amino acid sequence — the BiLSTM model classifies each residue as Helix, Sheet, or Coil, then renders an interactive 3D molecular model you can rotate and explore.</p>
+    <div class="legend">
+      <div class="leg"><div class="leg-dot" style="background:var(--helix)"></div>H — Alpha Helix</div>
+      <div class="leg"><div class="leg-dot" style="background:var(--sheet)"></div>E — Beta Sheet</div>
+      <div class="leg"><div class="leg-dot" style="background:var(--coil)"></div>C — Coil / Loop</div>
+    </div>
+  </header>
+
+  <div class="card">
+    <div class="card-lbl">// Amino Acid Sequence Input</div>
+    <textarea id="seqInput" placeholder="e.g.  ACDEFGHIKLMNPQRSTVWYACDEFGHIKLM" spellcheck="false"></textarea>
+    <div class="row">
+      <button class="btn btn-p" id="predictBtn" onclick="runPrediction()">Run Prediction</button>
+      <button class="btn btn-s" onclick="clearAll()">Clear</button>
+    </div>
+    <div class="chips">
+      <span class="chips-lbl">Examples →</span>
+      <span class="chip" onclick="loadEx('hemo')">Hemoglobin</span>
+      <span class="chip" onclick="loadEx('insulin')">Insulin</span>
+      <span class="chip" onclick="loadEx('lysozyme')">Lysozyme</span>
+    </div>
+    <div class="status" id="status"></div>
+  </div>
+
+  <div id="results">
+    <div class="stats-row fade-in" id="statsRow"></div>
+
+    <div class="sec-title">// Per-Residue Structure Map &nbsp;<span style="color:var(--muted);font-size:10px">(hover for details)</span></div>
+    <div class="seq-card"><div class="seq-row" id="seqViz"></div></div>
+
+    <!-- 3D VIEWER -->
+    <div class="viewer-section fade-in">
+      <div class="viewer-header">
+        <div class="sec-title" style="margin:0">// Interactive 3D Molecular Model — Drag to Rotate · Scroll to Zoom</div>
+        <div class="viewer-controls">
+          <button class="vbtn active" id="btnBall"   onclick="setMode('ball')">Ball &amp; Stick</button>
+          <button class="vbtn"        id="btnRibbon" onclick="setMode('ribbon')">Ribbon</button>
+          <button class="vbtn"        id="btnSphere" onclick="setMode('sphere')">Space Fill</button>
+          <button class="vbtn"        id="btnReset"  onclick="resetCamera()">Reset View</button>
+          <button class="vbtn"        id="btnSpin"   onclick="toggleSpin()">&#9654; Auto Spin</button>
+        </div>
+      </div>
+      <div class="viewer-wrap">
+        <canvas id="threeCanvas"></canvas>
+        <div class="viewer-overlay">Drag to rotate &nbsp;·&nbsp; Scroll to zoom &nbsp;·&nbsp; Hover atoms for residue info</div>
+        <div class="viewer-tooltip" id="tooltip">
+          <div class="tt-row"><span class="tt-key">Position</span><span class="tt-val" id="tt-pos">—</span></div>
+          <div class="tt-row"><span class="tt-key">Amino Acid</span><span class="tt-val" id="tt-aa">—</span></div>
+          <div class="tt-row"><span class="tt-key">Structure</span><span class="tt-val" id="tt-ss">—</span></div>
+          <div class="tt-row"><span class="tt-key">Confidence</span><span class="tt-val" id="tt-conf">—</span></div>
+        </div>
+      </div>
+      <div class="legend-3d">
+        <div class="l3d"><div class="l3d-swatch" style="background:var(--helix)"></div>Alpha Helix</div>
+        <div class="l3d"><div class="l3d-swatch" style="background:var(--sheet)"></div>Beta Sheet</div>
+        <div class="l3d"><div class="l3d-swatch" style="background:var(--coil)"></div>Coil / Loop</div>
+        <div class="l3d" style="margin-left:auto;font-size:10px;opacity:.5">Ball size = prediction confidence</div>
+      </div>
+    </div>
+
+    <div class="chart-grid fade-in">
+      <div class="chart-card">
+        <div class="sec-title">// Structure Distribution</div>
+        <canvas id="pieChart"></canvas>
+      </div>
+      <div class="chart-card">
+        <div class="sec-title">// Residue Count by Type</div>
+        <canvas id="barChart"></canvas>
+      </div>
+    </div>
+
+    <div class="conf-card fade-in">
+      <div class="sec-title">// Per-Position Confidence (first 80 residues)</div>
+      <canvas id="lineChart"></canvas>
+    </div>
+
+    <div class="sec-title">// Full Residue Detail Table</div>
+    <div class="tbl-wrap fade-in">
+      <table>
+        <thead>
+          <tr><th>#</th><th>AA</th><th>Structure</th><th>H conf</th><th>E conf</th><th>C conf</th><th>Top Conf</th></tr>
+        </thead>
+        <tbody id="resTbl"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <footer>
+    <span>ProteinAI — BiLSTM Secondary Structure Predictor</span>
+    <span>PyTorch · Flask · Three.js · Chart.js</span>
+  </footer>
+</div>
+
+<script>
+const EX = {
+  hemo:     "VLSPADKTNVKAAWGKVGAHAGEYGAEALERMFLSFPTTKTYFPHFDLSHGSAQVKGHGKKVADALTNAVAHVDDMPNALSALSDLHAHKLRVDPVNFKLLSHCLLVTLAAHLPAEFTPAVHASLDKFLASVSTVLTSKYR",
+  insulin:  "MALWMRLLPLLALLALWGPDPAAAFVNQHLCGSHLVEALYLVCGERGFFYTPKTRREAEDLQVGQVELGGGPGAGSLQPLALEGSLQKRGIVEQCCTSICSLYQLENYCN",
+  lysozyme: "KVFERCELARTLKRLGMDGYRGISLANWMCLAKWESGYNTRATNYNAGDRSTDYGIFQINSRYWCNDGKTPGAVNACHLSCSALLQDNIADAVACAKRVVRDPQGIRAWVAWRNRCQNRDVRQYVQGCGV"
+};
+
+function loadEx(k){ document.getElementById('seqInput').value=EX[k]; }
+
+function clearAll(){
+  document.getElementById('seqInput').value='';
+  document.getElementById('status').textContent='';
+  document.getElementById('results').style.display='none';
+  [pieChart,barChart,lineChart].forEach(c=>c&&c.destroy());
+  pieChart=barChart=lineChart=null;
+  disposeThree();
+}
+
+function setStatus(msg,type=''){
+  const el=document.getElementById('status');
+  el.className='status '+type;
+  el.innerHTML=msg;
+}
+
+let currentData=null;
+
+async function runPrediction(){
+  const seq=document.getElementById('seqInput').value.trim().toUpperCase().replace(/\s+/g,'');
+  if(!seq){ setStatus('Please enter a sequence.','error'); return; }
+  const btn=document.getElementById('predictBtn');
+  btn.disabled=true;
+  setStatus('<span class="spinner"></span> Running BiLSTM prediction…','loading');
+  try {
+    const r=await fetch('/predict',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sequence:seq})});
+    const data=await r.json();
+    if(data.error){ setStatus('⚠ '+data.error,'error'); return; }
+    setStatus(data.demo_mode?'✓ Demo mode active — train the model for real predictions.':'✓ Prediction complete — 3D model rendered below.',data.demo_mode?'demo':'');
+    currentData=data;
+    renderResults(data);
+  } catch(e){ setStatus('⚠ Connection error: '+e.message,'error'); }
+  finally { btn.disabled=false; }
+}
+
+let pieChart=null,barChart=null,lineChart=null;
+
+function renderResults(data){
+  const {sequence,structure,per_residue,counts,percentages}=data;
+
+  document.getElementById('statsRow').innerHTML=`
+    <div class="stat"><div class="stat-lbl">Alpha Helix</div><div class="stat-val h">${percentages.H}%</div><div class="stat-sub">${counts.H} residues</div></div>
+    <div class="stat"><div class="stat-lbl">Beta Sheet</div><div class="stat-val e">${percentages.E}%</div><div class="stat-sub">${counts.E} residues</div></div>
+    <div class="stat"><div class="stat-lbl">Coil / Loop</div><div class="stat-val c">${percentages.C}%</div><div class="stat-sub">${counts.C} residues</div></div>
+    <div class="stat"><div class="stat-lbl">Length</div><div class="stat-val" style="color:var(--text)">${sequence.length}</div><div class="stat-sub">amino acids</div></div>`;
+
+  document.getElementById('seqViz').innerHTML=per_residue.map(r=>`
+    <div class="res ${r.structure}" title="Pos ${r.position}: ${r.amino_acid} → ${r.structure_name} (${Math.round(r.confidence[r.structure]*100)}%)">
+      <span class="res-aa">${r.amino_acid}</span>
+      <span class="res-ss">${r.structure}</span>
+    </div>`).join('');
+
+  [pieChart,barChart,lineChart].forEach(c=>c&&c.destroy());
+
+  pieChart=new Chart(document.getElementById('pieChart'),{
+    type:'doughnut',
+    data:{labels:['Alpha Helix','Beta Sheet','Coil'],datasets:[{data:[counts.H,counts.E,counts.C],backgroundColor:['rgba(0,229,255,.7)','rgba(105,255,138,.7)','rgba(255,107,53,.7)'],borderColor:'#040810',borderWidth:3}]},
+    options:{cutout:'62%',plugins:{legend:{labels:{color:'#3d6080',font:{family:'JetBrains Mono',size:11}}}},animation:{duration:700}}
+  });
+
+  barChart=new Chart(document.getElementById('barChart'),{
+    type:'bar',
+    data:{labels:['Helix (H)','Sheet (E)','Coil (C)'],datasets:[{label:'Count',data:[counts.H,counts.E,counts.C],backgroundColor:['rgba(0,229,255,.55)','rgba(105,255,138,.55)','rgba(255,107,53,.55)'],borderRadius:0}]},
+    options:{plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#3d6080',font:{family:'JetBrains Mono',size:11}},grid:{color:'rgba(20,34,56,.5)'}},y:{ticks:{color:'#3d6080',font:{family:'JetBrains Mono',size:11}},grid:{color:'rgba(20,34,56,.5)'}}},animation:{duration:700}}
+  });
+
+  const sl=per_residue.slice(0,80);
+  lineChart=new Chart(document.getElementById('lineChart'),{
+    type:'line',
+    data:{labels:sl.map(r=>r.position),datasets:[
+      {label:'Helix', data:sl.map(r=>r.confidence.H),borderColor:'#00e5ff',backgroundColor:'rgba(0,229,255,.04)',tension:.38,fill:true,pointRadius:0,borderWidth:1.5},
+      {label:'Sheet', data:sl.map(r=>r.confidence.E),borderColor:'#69ff8a',backgroundColor:'rgba(105,255,138,.04)',tension:.38,fill:true,pointRadius:0,borderWidth:1.5},
+      {label:'Coil',  data:sl.map(r=>r.confidence.C),borderColor:'#ff6b35',backgroundColor:'rgba(255,107,53,.04)',tension:.38,fill:true,pointRadius:0,borderWidth:1.5}
+    ]},
+    options:{plugins:{legend:{labels:{color:'#3d6080',font:{family:'JetBrains Mono',size:11}}}},scales:{x:{ticks:{color:'#3d6080',font:{family:'JetBrains Mono',size:10}},grid:{color:'rgba(20,34,56,.4)'}},y:{min:0,max:1,ticks:{color:'#3d6080',font:{family:'JetBrains Mono',size:10}},grid:{color:'rgba(20,34,56,.4)'}}},animation:{duration:700}}
+  });
+
+  document.getElementById('resTbl').innerHTML=per_residue.map(r=>{
+    const top=r.confidence[r.structure];
+    return `<tr>
+      <td style="color:var(--muted)">${r.position}</td>
+      <td style="font-weight:600;color:var(--text)">${r.amino_acid}</td>
+      <td><span class="tag ${r.structure}">${r.structure} — ${r.structure_name}</span></td>
+      <td style="color:var(--helix)">${(r.confidence.H*100).toFixed(1)}%</td>
+      <td style="color:var(--sheet)">${(r.confidence.E*100).toFixed(1)}%</td>
+      <td style="color:var(--coil)">${(r.confidence.C*100).toFixed(1)}%</td>
+      <td><div class="cbar-wrap"><div class="cbar"><div class="cbar-fill ${r.structure}" style="width:${Math.round(top*100)}%"></div></div><span style="color:var(--muted);font-size:10px">${Math.round(top*100)}%</span></div></td>
+    </tr>`;}).join('');
+
+  document.getElementById('results').style.display='block';
+  setTimeout(()=>{
+    buildThreeScene(per_residue);
+    document.getElementById('results').scrollIntoView({behavior:'smooth',block:'start'});
+  },120);
+}
+
+/* ════════════ THREE.JS 3D VIEWER ════════════ */
+let renderer=null,scene=null,camera=null,animFrameId=null;
+let raycaster=null,mouse=null;
+let residueMeshes=[];
+let autoSpin=false;
+let currentMode='ball';
+let isDragging=false,prevMouse={x:0,y:0};
+let sphericalTheta=0.3,sphericalPhi=1.2,sphericalRadius=45;
+let targetTheta=0.3,targetPhi=1.2;
+
+const COLOR_H=new THREE.Color(0x00e5ff);
+const COLOR_E=new THREE.Color(0x69ff8a);
+const COLOR_C=new THREE.Color(0xff6b35);
+const EMIS_H =new THREE.Color(0x002233);
+const EMIS_E =new THREE.Color(0x002211);
+const EMIS_C =new THREE.Color(0x220d00);
+
+function getColor(ss){ return ss==='H'?COLOR_H:ss==='E'?COLOR_E:COLOR_C; }
+function getEmis(ss){  return ss==='H'?EMIS_H :ss==='E'?EMIS_E :EMIS_C;  }
+
+function disposeThree(){
+  if(animFrameId) cancelAnimationFrame(animFrameId);
+  if(renderer){
+    const c=document.getElementById('threeCanvas');
+    c.removeEventListener('mousedown',onMD);
+    c.removeEventListener('mousemove',onMM);
+    c.removeEventListener('mouseup',  onMU);
+    c.removeEventListener('wheel',    onMW);
+    renderer.dispose();
+  }
+  renderer=scene=camera=null; residueMeshes=[];
+}
+
+function genCoords(pr){
+  const out=[];
+  let x=0,y=0,z=0,ha=0;
+  const HR=1.8,HRISE=1.1,HT=Math.PI*2/3.6;
+  for(let i=0;i<pr.length;i++){
+    const r=pr[i];
+    if(r.structure==='H'){
+      ha+=HT; x=HR*Math.cos(ha); z=HR*Math.sin(ha); y+=HRISE;
+    } else if(r.structure==='E'){
+      ha=0; x+=1.4; z+=(i%2?0.25:-0.25); y+=0.06;
+    } else {
+      ha=0; const a=i*1.15;
+      x+=1.0+Math.sin(a)*0.55; y+=0.5+Math.cos(a*.7)*.28; z+=Math.sin(a*1.3)*.55;
+    }
+    out.push({x,y,z,res:r});
+  }
+  let cx=0,cy=0,cz=0;
+  out.forEach(c=>{cx+=c.x;cy+=c.y;cz+=c.z;});
+  cx/=out.length;cy/=out.length;cz/=out.length;
+  out.forEach(c=>{c.x-=cx;c.y-=cy;c.z-=cz;});
+  return out;
+}
+
+function makeMat(ss,transparent,opacity){
+  return new THREE.MeshPhongMaterial({color:getColor(ss),emissive:getEmis(ss),shininess:90,transparent,opacity:transparent?opacity:1});
+}
+
+function addCylinder(a,b,ss,r){
+  const dir=new THREE.Vector3(b.x-a.x,b.y-a.y,b.z-a.z);
+  const len=dir.length();
+  const mid=new THREE.Vector3((a.x+b.x)/2,(a.y+b.y)/2,(a.z+b.z)/2);
+  const geo=new THREE.CylinderGeometry(r,r,len,10,1);
+  const m=new THREE.Mesh(geo,makeMat(ss,false,1));
+  m.position.copy(mid);
+  m.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),dir.normalize());
+  m.userData={isBond:true};
+  scene.add(m);
+}
+
+function buildMode(coords,mode){
+  scene.children.filter(c=>c.userData.isBond||c.userData.isRes).forEach(c=>scene.remove(c));
+  residueMeshes=[];
+
+  if(mode==='ball'||mode==='sphere'){
+    const baseR=mode==='sphere'?1.1:0.55;
+    coords.forEach((c,i)=>{
+      const conf=c.res.confidence[c.res.structure];
+      const r=mode==='sphere'?baseR:baseR*(0.55+conf*0.9);
+      const geo=new THREE.SphereGeometry(r,16,12);
+      const mat=makeMat(c.res.structure,mode==='sphere',0.82);
+      const m=new THREE.Mesh(geo,mat);
+      m.position.set(c.x,c.y,c.z);
+      m.userData={res:c.res,isRes:true};
+      scene.add(m); residueMeshes.push(m);
+    });
+    if(mode==='ball'){
+      for(let i=0;i<coords.length-1;i++) addCylinder(coords[i],coords[i+1],coords[i].res.structure,0.12);
+    }
+  }
+
+  if(mode==='ribbon'){
+    for(let i=0;i<coords.length-1;i++) addCylinder(coords[i],coords[i+1],coords[i].res.structure,0.38);
+    coords.forEach((c,i)=>{
+      if(i===0||i===coords.length-1||(i>0&&coords[i-1].res.structure!==c.res.structure)){
+        const geo=new THREE.SphereGeometry(0.55,12,10);
+        const m=new THREE.Mesh(geo,makeMat(c.res.structure,false,1));
+        m.position.set(c.x,c.y,c.z);
+        m.userData={res:c.res,isRes:true};
+        scene.add(m); residueMeshes.push(m);
+      } else {
+        /* invisible hover target */
+        const geo=new THREE.SphereGeometry(0.32,6,5);
+        const mat=new THREE.MeshBasicMaterial({transparent:true,opacity:0});
+        const m=new THREE.Mesh(geo,mat);
+        m.position.set(c.x,c.y,c.z);
+        m.userData={res:c.res,isRes:true,invis:true};
+        scene.add(m); residueMeshes.push(m);
+      }
+    });
+  }
+}
+
+function buildThreeScene(pr){
+  disposeThree();
+  const canvas=document.getElementById('threeCanvas');
+  const W=canvas.clientWidth,H=500;
+
+  renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true});
+  renderer.setSize(W,H,false);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+  renderer.setClearColor(0x000000,0);
+
+  scene=new THREE.Scene();
+  camera=new THREE.PerspectiveCamera(45,W/H,0.1,500);
+
+  scene.add(new THREE.AmbientLight(0xffffff,0.3));
+  const d1=new THREE.DirectionalLight(0x00e5ff,0.9); d1.position.set(10,20,10); scene.add(d1);
+  const d2=new THREE.DirectionalLight(0xff6b35,0.4); d2.position.set(-10,-10,-5); scene.add(d2);
+  const p1=new THREE.PointLight(0x69ff8a,0.7,80); p1.position.set(0,0,25); scene.add(p1);
+  const p2=new THREE.PointLight(0x00e5ff,0.4,60); p2.position.set(-15,15,-10); scene.add(p2);
+
+  raycaster=new THREE.Raycaster();
+  mouse=new THREE.Vector2();
+
+  const coords=genCoords(pr);
+  buildMode(coords,currentMode);
+
+  canvas.addEventListener('mousedown',onMD);
+  canvas.addEventListener('mousemove',onMM);
+  canvas.addEventListener('mouseup',  onMU);
+  canvas.addEventListener('mouseleave',()=>{isDragging=false;hideTooltip();});
+  canvas.addEventListener('wheel',    onMW,{passive:true});
+
+  window.addEventListener('resize',()=>{
+    if(!renderer) return;
+    const nw=canvas.clientWidth;
+    renderer.setSize(nw,H,false);
+    camera.aspect=nw/H;
+    camera.updateProjectionMatrix();
+  });
+
+  animate();
+}
+
+function onMD(e){ isDragging=true; prevMouse={x:e.clientX,y:e.clientY}; }
+function onMU(){ isDragging=false; }
+
+function onMM(e){
+  if(isDragging){
+    const dx=e.clientX-prevMouse.x, dy=e.clientY-prevMouse.y;
+    targetTheta-=dx*0.008;
+    targetPhi=Math.max(0.15,Math.min(Math.PI-0.15,targetPhi+dy*0.008));
+    prevMouse={x:e.clientX,y:e.clientY};
+    return;
+  }
+  const canvas=document.getElementById('threeCanvas');
+  const rect=canvas.getBoundingClientRect();
+  mouse.x=((e.clientX-rect.left)/rect.width)*2-1;
+  mouse.y=((e.clientY-rect.top)/rect.height)*-2+1;
+  raycaster.setFromCamera(mouse,camera);
+  const hits=raycaster.intersectObjects(residueMeshes.filter(m=>!m.userData.invis));
+  if(hits.length>0){
+    const r=hits[0].object.userData.res;
+    if(r){
+      document.getElementById('tt-pos').textContent=r.position;
+      document.getElementById('tt-aa').textContent=r.amino_acid;
+      const ssEl=document.getElementById('tt-ss');
+      ssEl.className='tt-val '+r.structure;
+      ssEl.textContent=r.structure+' — '+r.structure_name;
+      document.getElementById('tt-conf').textContent=Math.round(r.confidence[r.structure]*100)+'%';
+      const tt=document.getElementById('tooltip');
+      tt.style.display='block';
+      tt.style.left=(e.clientX-rect.left+16)+'px';
+      tt.style.top=(e.clientY-rect.top-10)+'px';
+    }
+  } else { hideTooltip(); }
+}
+
+function onMW(e){ sphericalRadius=Math.max(8,Math.min(130,sphericalRadius+e.deltaY*0.045)); }
+function hideTooltip(){ document.getElementById('tooltip').style.display='none'; }
+
+function setMode(mode){
+  if(!currentData) return;
+  currentMode=mode;
+  ['ball','ribbon','sphere'].forEach(m=>{
+    const el=document.getElementById('btn'+m.charAt(0).toUpperCase()+m.slice(1));
+    if(el) el.classList.toggle('active',m===mode);
+  });
+  buildMode(genCoords(currentData.per_residue),mode);
+}
+
+function resetCamera(){ targetTheta=0.3; targetPhi=1.2; sphericalRadius=45; }
+
+function toggleSpin(){
+  autoSpin=!autoSpin;
+  document.getElementById('btnSpin').classList.toggle('active',autoSpin);
+}
+
+function animate(){
+  animFrameId=requestAnimationFrame(animate);
+  if(!renderer||!scene||!camera) return;
+  sphericalTheta+=(targetTheta-sphericalTheta)*0.07;
+  sphericalPhi  +=(targetPhi  -sphericalPhi  )*0.07;
+  if(autoSpin) targetTheta+=0.005;
+  camera.position.set(
+    sphericalRadius*Math.sin(sphericalPhi)*Math.sin(sphericalTheta),
+    sphericalRadius*Math.cos(sphericalPhi),
+    sphericalRadius*Math.sin(sphericalPhi)*Math.cos(sphericalTheta)
+  );
+  camera.lookAt(0,0,0);
+  renderer.render(scene,camera);
+}
+
+document.addEventListener('keydown',e=>{ if((e.ctrlKey||e.metaKey)&&e.key==='Enter') runPrediction(); });
+</script>
+</body>
+</html>

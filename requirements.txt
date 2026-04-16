@@ -1,0 +1,6 @@
+# requirements.txt
+# Install with: pip install -r requirements.txt
+
+torch>=2.0.0
+numpy>=1.24.0
+flask>=3.0.0

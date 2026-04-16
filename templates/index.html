@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>ProteinAI — Secondary Structure Predictor</title>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet"/>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg:#040912;--s1:#080f1e;--s2:#0c1628;--s3:#101e35;
+      --bd:#152540;--bd2:#1e3358;
+      --H:#00e5ff;--E:#6aff8e;--C:#ff6b35;
+      --acc:#00e5ff;--txt:#c8dff5;--mut:#3d6080;
+      --fh:'Syne',sans-serif;--fm:'JetBrains Mono',monospace;
+    }
+    html{scroll-behavior:smooth}
+    body{background:var(--bg);color:var(--txt);font-family:var(--fh);min-height:100vh;overflow-x:hidden}
+    body::before{content:'';position:fixed;inset:0;z-index:0;
+      background-image:linear-gradient(rgba(0,229,255,.02) 1px,transparent 1px),linear-gradient(90deg,rgba(0,229,255,.02) 1px,transparent 1px);
+      background-size:48px 48px;pointer-events:none}
+    .wrap{position:relative;z-index:1;max-width:1120px;margin:0 auto;padding:0 28px 100px}
+
+    /* ── Header ── */
+    header{padding:52px 0 32px}
+    .badge{font-family:var(--fm);font-size:10px;letter-spacing:3px;color:var(--acc);border:1px solid rgba(0,229,255,.25);padding:5px 12px;display:inline-block;margin-bottom:20px}
+    h1{font-size:clamp(2.2rem,5.5vw,4rem);font-weight:800;line-height:1.04;letter-spacing:-1.5px}
+    h1 em{color:var(--acc);font-style:normal}
+    .sub{margin-top:14px;font-family:var(--fm);font-size:.88rem;color:var(--mut);line-height:1.7;max-width:580px}
+    .leg{display:flex;gap:24px;flex-wrap:wrap;margin-top:24px}
+    .li{display:flex;align-items:center;gap:8px;font-family:var(--fm);font-size:12px;color:var(--mut)}
+    .ld{width:10px;height:10px;border-radius:50%}
+
+    /* ── Input ── */
+    .card{background:var(--s1);border:1px solid var(--bd);padding:26px 28px;margin-top:40px}
+    .clbl{font-family:var(--fm);font-size:10px;letter-spacing:2.5px;color:var(--mut);text-transform:uppercase;margin-bottom:13px}
+    textarea{width:100%;background:var(--bg);border:1px solid var(--bd);color:var(--acc);font-family:var(--fm);font-size:14px;padding:16px;resize:vertical;min-height:105px;outline:none;letter-spacing:1px;line-height:1.85;transition:border-color .2s}
+    textarea::placeholder{color:var(--mut);opacity:.45}
+    textarea:focus{border-color:var(--acc)}
+    .row{display:flex;gap:10px;margin-top:13px;flex-wrap:wrap}
+    .btn{font-family:var(--fh);font-size:13px;font-weight:700;letter-spacing:1.2px;padding:12px 28px;border:none;cursor:pointer;text-transform:uppercase;transition:all .15s}
+    .bp{background:var(--acc);color:var(--bg)}
+    .bp:hover{filter:brightness(1.15);transform:translateY(-1px)}
+    .bp:disabled{opacity:.4;cursor:not-allowed;transform:none}
+    .bs{background:transparent;color:var(--mut);border:1px solid var(--bd)}
+    .bs:hover{border-color:var(--acc);color:var(--acc)}
+    .chips{display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin-top:12px}
+    .clb{font-family:var(--fm);font-size:11px;color:var(--mut)}
+    .chip{font-family:var(--fm);font-size:11px;background:transparent;border:1px solid var(--bd);color:var(--mut);padding:4px 10px;cursor:pointer;transition:all .15s}
+    .chip:hover{border-color:var(--acc);color:var(--acc)}
+    .st{margin-top:14px;font-family:var(--fm);font-size:13px;min-height:20px}
+    .st.ld2{color:var(--acc)}.st.err{color:var(--C)}.st.demo{color:var(--E)}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .sp{display:inline-block;width:12px;height:12px;border:2px solid rgba(0,229,255,.2);border-top-color:var(--acc);border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:6px}
+
+    /* ── Results ── */
+    #results{margin-top:44px;display:none}
+    .sec{font-family:var(--fm);font-size:10px;letter-spacing:2.5px;text-transform:uppercase;color:var(--mut);margin-bottom:13px}
+    .sg{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:26px}
+    @media(max-width:680px){.sg{grid-template-columns:1fr 1fr}}
+    .sc{background:var(--s1);border:1px solid var(--bd);padding:18px 18px 14px}
+    .sl{font-family:var(--fm);font-size:10px;letter-spacing:1.5px;color:var(--mut);text-transform:uppercase}
+    .sv{font-size:2.3rem;font-weight:800;margin-top:5px;letter-spacing:-1px;line-height:1}
+    .sv.h{color:var(--H);text-shadow:0 0 22px rgba(0,229,255,.35)}
+    .sv.e{color:var(--E);text-shadow:0 0 22px rgba(106,255,142,.35)}
+    .sv.c{color:var(--C);text-shadow:0 0 22px rgba(255,107,53,.35)}
+    .ss{font-family:var(--fm);font-size:11px;color:var(--mut);margin-top:4px}
+
+    /* ── Seq map ── */
+    .sqc{background:var(--s1);border:1px solid var(--bd);padding:18px;margin-bottom:26px;overflow-x:auto}
+    .sqr{display:flex;flex-wrap:wrap;gap:2px}
+    .rs{display:inline-flex;flex-direction:column;align-items:center;gap:2px;padding:5px 4px;cursor:pointer;transition:transform .1s;border-bottom:2px solid transparent}
+    .rs:hover{transform:translateY(-3px);z-index:5}
+    .raa{font-family:var(--fm);font-weight:600;font-size:12px;line-height:1}
+    .rss{font-family:var(--fm);font-size:9px;line-height:1;opacity:.7}
+    .rs.H{background:rgba(0,229,255,.09);color:var(--H);border-bottom-color:var(--H)}
+    .rs.E{background:rgba(106,255,142,.09);color:var(--E);border-bottom-color:var(--E)}
+    .rs.C{background:rgba(255,107,53,.09);color:var(--C);border-bottom-color:var(--C)}
+
+    /* ── Search bar (NEW) ── */
+    .search-bar{display:flex;gap:8px;margin-bottom:10px}
+    .search-bar input{flex:1;background:var(--bg);border:1px solid var(--bd);color:var(--txt);font-family:var(--fm);font-size:12px;padding:7px 12px;outline:none}
+    .search-bar input:focus{border-color:var(--acc)}
+    .search-bar input::placeholder{color:var(--mut);opacity:.5}
+    #seqStats{font-family:var(--fm);font-size:11px;color:var(--mut);margin-top:6px}
+
+    /* ── 3D Viewer ── */
+    .vs{margin-bottom:26px}
+    .vh{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:13px}
+    .vc{display:flex;gap:7px;flex-wrap:wrap}
+    .vb{font-family:var(--fm);font-size:10px;letter-spacing:1px;padding:6px 13px;cursor:pointer;background:transparent;border:1px solid var(--bd);color:var(--mut);transition:all .15s;text-transform:uppercase}
+    .vb:hover,.vb.active{border-color:var(--acc);color:var(--acc);background:rgba(0,229,255,.05)}
+    .vb.active{box-shadow:0 0 10px rgba(0,229,255,.18)}
+    .vw{position:relative;background:var(--s1);border:1px solid var(--bd);overflow:hidden}
+    #tc{display:block;width:100%!important;height:500px!important;cursor:grab}
+    #tc:active{cursor:grabbing}
+    .vo{position:absolute;bottom:14px;left:14px;font-family:var(--fm);font-size:11px;color:var(--mut);pointer-events:none;line-height:1.7}
+    .vt{position:absolute;background:var(--s2);border:1px solid var(--bd);padding:10px 14px;font-family:var(--fm);font-size:12px;pointer-events:none;display:none;z-index:20;min-width:200px}
+    .tr{display:flex;justify-content:space-between;gap:20px;margin-bottom:3px}
+    .tk{color:var(--mut)}.tv{font-weight:600}
+    .tv.H{color:var(--H)}.tv.E{color:var(--E)}.tv.C{color:var(--C)}
+    .l3{display:flex;gap:18px;flex-wrap:wrap;margin-top:11px;font-family:var(--fm);font-size:11px}
+    .l3i{display:flex;align-items:center;gap:7px;color:var(--mut)}
+    .l3s{width:26px;height:7px;border-radius:2px}
+
+    /* ── Segment panel (NEW) ── */
+    .seg-panel{background:var(--s1);border:1px solid var(--bd);padding:18px;margin-bottom:26px}
+    .seg-list{display:flex;flex-direction:column;gap:6px;max-height:200px;overflow-y:auto}
+    .seg-item{display:flex;align-items:center;gap:12px;padding:8px 12px;background:var(--s2);border:1px solid var(--bd);cursor:pointer;transition:border-color .15s}
+    .seg-item:hover{border-color:var(--acc)}
+    .seg-tag{font-family:var(--fm);font-size:10px;font-weight:700;padding:2px 8px;letter-spacing:1px}
+    .seg-tag.H{background:rgba(0,229,255,.12);color:var(--H)}
+    .seg-tag.E{background:rgba(106,255,142,.12);color:var(--E)}
+    .seg-tag.C{background:rgba(255,107,53,.12);color:var(--C)}
+    .seg-seq{font-family:var(--fm);font-size:12px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .seg-pos{font-family:var(--fm);font-size:11px;color:var(--mut)}
+
+    /* ── Charts ── */
+    .cg{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:26px}
+    @media(max-width:640px){.cg{grid-template-columns:1fr}}
+    .cc{background:var(--s1);border:1px solid var(--bd);padding:18px}
+    .cc canvas{max-height:220px}
+    .lc{background:var(--s1);border:1px solid var(--bd);padding:18px;margin-bottom:26px}
+    .lc canvas{max-height:170px}
+
+    /* ── Heatmap (NEW) ── */
+    .hm{background:var(--s1);border:1px solid var(--bd);padding:18px;margin-bottom:26px}
+    #hmCanvas{width:100%;border-radius:2px}
+
+    /* ── Export row (NEW) ── */
+    .exp-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:26px}
+
+    /* ── Table ── */
+    .tw{background:var(--s1);border:1px solid var(--bd);overflow:hidden;margin-bottom:26px;max-height:400px;overflow-y:auto}
+    table{width:100%;border-collapse:collapse;font-family:var(--fm);font-size:12px}
+    thead{position:sticky;top:0;z-index:5}
+    thead th{background:var(--s3);color:var(--mut);text-transform:uppercase;letter-spacing:1px;font-size:10px;padding:10px 13px;text-align:left;border-bottom:1px solid var(--bd)}
+    tbody tr{border-bottom:1px solid rgba(21,37,64,.5)}
+    tbody tr:last-child{border-bottom:none}
+    tbody tr:hover{background:rgba(0,229,255,.022)}
+    tbody td{padding:8px 13px}
+    .tag{display:inline-block;padding:2px 8px;font-size:10px;font-weight:700;letter-spacing:1px}
+    .tag.H{background:rgba(0,229,255,.12);color:var(--H)}
+    .tag.E{background:rgba(106,255,142,.12);color:var(--E)}
+    .tag.C{background:rgba(255,107,53,.12);color:var(--C)}
+    .cb{display:flex;align-items:center;gap:7px}
+    .cbr{flex:1;height:4px;background:var(--bg);max-width:85px}
+    .cbf{height:100%}
+    .cbf.H{background:var(--H)}.cbf.E{background:var(--E)}.cbf.C{background:var(--C)}
+
+    footer{margin-top:56px;border-top:1px solid var(--bd);padding-top:22px;font-family:var(--fm);font-size:11px;color:var(--mut);display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px}
+    @keyframes fup{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+    .fi{animation:fup .5s ease forwards}
+  </style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="badge">AI · BIOINFORMATICS · DEEP LEARNING</div>
+    <h1>Protein<em>AI</em><br/>Structure Predictor</h1>
+    <p class="sub">Input an amino acid sequence. The BiLSTM model predicts each residue's secondary structure, renders an interactive 3D model, detects structural segments, and lets you export the full analysis.</p>
+    <div class="leg">
+      <div class="li"><div class="ld" style="background:var(--H)"></div>H — Alpha Helix</div>
+      <div class="li"><div class="ld" style="background:var(--E)"></div>E — Beta Sheet</div>
+      <div class="li"><div class="ld" style="background:var(--C)"></div>C — Coil / Loop</div>
+    </div>
+  </header>
+
+  <!-- Input -->
+  <div class="card">
+    <div class="clbl">// Amino Acid Sequence Input</div>
+    <textarea id="seqInput" placeholder="e.g.  ACDEFGHIKLMNPQRSTVWYACDEFGHIKLM" spellcheck="false"></textarea>
+    <div id="seqLen" style="font-family:var(--fm);font-size:11px;color:var(--mut);margin-top:6px;min-height:16px"></div>
+    <div class="row">
+      <button class="btn bp" id="pb" onclick="runPrediction()">Run Prediction</button>
+      <button class="btn bs" onclick="clearAll()">Clear</button>
+    </div>
+    <div class="chips">
+      <span class="clb">Examples →</span>
+      <span class="chip" onclick="loadEx('hemo')">Hemoglobin</span>
+      <span class="chip" onclick="loadEx('insulin')">Insulin</span>
+      <span class="chip" onclick="loadEx('lysozyme')">Lysozyme</span>
+      <span class="chip" onclick="loadEx('short')">Short test</span>
+    </div>
+    <div class="st" id="status"></div>
+  </div>
+
+  <!-- Results -->
+  <div id="results">
+
+    <!-- Stats -->
+    <div class="sg fi" id="statsRow"></div>
+
+    <!-- Seq map -->
+    <div class="sec" style="margin-top:4px">// Per-Residue Structure Map &nbsp;<span style="opacity:.5;font-size:9px">(hover to inspect · filter by type)</span></div>
+    <div class="sqc">
+      <div class="search-bar">
+        <input id="filterInput" placeholder="Filter by amino acid (e.g. A, G, P)..." oninput="filterResidues()"/>
+        <button class="btn bs" style="padding:6px 14px;font-size:11px" onclick="filterByStruct('H')">Helix only</button>
+        <button class="btn bs" style="padding:6px 14px;font-size:11px" onclick="filterByStruct('E')">Sheet only</button>
+        <button class="btn bs" style="padding:6px 14px;font-size:11px" onclick="filterByStruct('C')">Coil only</button>
+        <button class="btn bs" style="padding:6px 14px;font-size:11px" onclick="filterByStruct('')">All</button>
+      </div>
+      <div id="seqStats"></div>
+      <div class="sqr" id="seqViz" style="margin-top:10px"></div>
+    </div>
+
+    <!-- Structural segments (NEW) -->
+    <div class="sec">// Detected Structural Segments &nbsp;<span style="opacity:.5;font-size:9px">(consecutive runs of the same structure)</span></div>
+    <div class="seg-panel fi">
+      <div class="seg-list" id="segList"></div>
+    </div>
+
+    <!-- 3D Viewer -->
+    <div class="vs fi">
+      <div class="vh">
+        <div class="sec" style="margin:0">// Interactive 3D Molecular Model</div>
+        <div class="vc">
+          <button class="vb active" id="btnBall"   onclick="setMode('ball')">Ball &amp; Stick</button>
+          <button class="vb"        id="btnRibbon" onclick="setMode('ribbon')">Ribbon</button>
+          <button class="vb"        id="btnSphere" onclick="setMode('sphere')">Space Fill</button>
+          <button class="vb"        id="btnReset"  onclick="resetCam()">Reset</button>
+          <button class="vb"        id="btnSpin"   onclick="toggleSpin()">&#9654; Spin</button>
+        </div>
+      </div>
+      <div class="vw">
+        <canvas id="tc"></canvas>
+        <div class="vo">Drag · Scroll to zoom · Hover for residue info</div>
+        <div class="vt" id="tooltip">
+          <div class="tr"><span class="tk">Position</span><span class="tv" id="tp">—</span></div>
+          <div class="tr"><span class="tk">Amino Acid</span><span class="tv" id="ta">—</span></div>
+          <div class="tr"><span class="tk">Structure</span><span class="tv" id="ts2">—</span></div>
+          <div class="tr"><span class="tk">Confidence</span><span class="tv" id="tc2">—</span></div>
+        </div>
+      </div>
+      <div class="l3">
+        <div class="l3i"><div class="l3s" style="background:var(--H)"></div>Alpha Helix</div>
+        <div class="l3i"><div class="l3s" style="background:var(--E)"></div>Beta Sheet</div>
+        <div class="l3i"><div class="l3s" style="background:var(--C)"></div>Coil / Loop</div>
+        <div class="l3i" style="margin-left:auto;font-size:10px;opacity:.45">Ball size = prediction confidence</div>
+      </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="cg fi">
+      <div class="cc"><div class="sec">// Structure Distribution</div><canvas id="pieChart"></canvas></div>
+      <div class="cc"><div class="sec">// Residue Count by Type</div><canvas id="barChart"></canvas></div>
+    </div>
+
+    <!-- Confidence line -->
+    <div class="lc fi">
+      <div class="sec">// Per-Position Confidence (first 80 residues)</div>
+      <canvas id="lineChart"></canvas>
+    </div>
+
+    <!-- Confidence heatmap (NEW) -->
+    <div class="hm fi">
+      <div class="sec">// Confidence Heatmap — Color Intensity = Prediction Strength</div>
+      <canvas id="hmCanvas" height="80"></canvas>
+    </div>
+
+    <!-- Export buttons (NEW) -->
+    <div class="sec">// Export Results</div>
+    <div class="exp-row fi">
+      <button class="btn bs" onclick="exportCSV()">⬇ Download CSV</button>
+      <button class="btn bs" onclick="exportFASTA()">⬇ Download FASTA</button>
+      <button class="btn bs" onclick="copyJSON()">⬇ Copy JSON</button>
+      <button class="btn bs" onclick="exportPNG()">⬇ Save Heatmap PNG</button>
+    </div>
+
+    <!-- Table -->
+    <div class="sec">// Full Residue Detail Table</div>
+    <div class="tw fi">
+      <table>
+        <thead><tr>
+          <th onclick="sortTable('position')" style="cursor:pointer"># ⇅</th>
+          <th>AA</th>
+          <th onclick="sortTable('structure')" style="cursor:pointer">Structure ⇅</th>
+          <th>H conf</th><th>E conf</th><th>C conf</th>
+          <th onclick="sortTable('confidence')" style="cursor:pointer">Top ⇅</th>
+        </tr></thead>
+        <tbody id="resTbl"></tbody>
+      </table>
+    </div>
+
+  </div><!-- /results -->
+
+  <footer>
+    <span>ProteinAI — BiLSTM Secondary Structure Predictor</span>
+    <span>PyTorch · Flask · Three.js · Chart.js</span>
+  </footer>
+</div>
+
+<script>
+/* ════════════════════════════ EXAMPLES ════════════════════════════ */
+const EX={
+  hemo:    "VLSPADKTNVKAAWGKVGAHAGEYGAEALERMFLSFPTTKTYFPHFDLSHGSAQVKGHGKKVADALTNAVAHVDDMPNALSALSDLHAHKLRVDPVNFKLLSHCLLVTLAAHLPAEFTPAVHASLDKFLASVSTVLTSKYR",
+  insulin: "MALWMRLLPLLALLALWGPDPAAAFVNQHLCGSHLVEALYLVCGERGFFYTPKTRREAEDLQVGQVELGGGPGAGSLQPLALEGSLQKRGIVEQCCTSICSLYQLENYCN",
+  lysozyme:"KVFERCELARTLKRLGMDGYRGISLANWMCLAKWESGYNTRATNYNAGDRSTDYGIFQINSRYWCNDGKTPGAVNACHLSCSALLQDNIADAVACAKRVVRDPQGIRAWVAWRNRCQNRDVRQYVQGCGV",
+  short:   "ACDEFGHIKLMNPQRSTVWY"
+};
+
+function loadEx(k){
+  document.getElementById('seqInput').value=EX[k];
+  updateLen();
+}
+
+document.getElementById('seqInput').addEventListener('input',updateLen);
+function updateLen(){
+  const v=document.getElementById('seqInput').value.trim().replace(/\s+/g,'');
+  document.getElementById('seqLen').textContent=v.length?`Length: ${v.length} aa`:'';
+}
+
+function clearAll(){
+  document.getElementById('seqInput').value='';
+  document.getElementById('seqLen').textContent='';
+  document.getElementById('status').textContent='';
+  document.getElementById('results').style.display='none';
+  [pieChart,barChart,lineChart].forEach(c=>c&&c.destroy());
+  pieChart=barChart=lineChart=null;
+  disposeThree();
+}
+
+function setSt(msg,type=''){
+  const el=document.getElementById('status');
+  el.className='st '+type; el.innerHTML=msg;
+}
+
+/* ════════════════════════════ DATA STATE ════════════════════════════ */
+let currentData=null, sortDir={}, currentFilter='';
+
+/* ════════════════════════════ PREDICTION ════════════════════════════ */
+async function runPrediction(){
+  const seq=document.getElementById('seqInput').value.trim().toUpperCase().replace(/\s+/g,'');
+  if(!seq){setSt('Please enter a sequence.','err');return;}
+  const btn=document.getElementById('pb');
+  btn.disabled=true;
+  setSt('<span class="sp"></span> Running BiLSTM prediction…','ld2');
+  try{
+    const r=await fetch('/predict',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sequence:seq})});
+    const data=await r.json();
+    if(data.error){setSt('⚠ '+data.error,'err');return;}
+    setSt(data.demo_mode?'✓ Demo mode — train model for real predictions.':'✓ Done — 3D model, heatmap & segments ready below.',data.demo_mode?'demo':'');
+    currentData=data;
+    renderAll(data);
+  }catch(e){setSt('⚠ Connection error: '+e.message,'err');}
+  finally{btn.disabled=false;}
+}
+
+/* ════════════════════════════ RENDER ALL ════════════════════════════ */
+let pieChart=null,barChart=null,lineChart=null;
+
+function renderAll(data){
+  const{sequence,structure,per_residue,counts,percentages}=data;
+
+  /* Stats */
+  document.getElementById('statsRow').innerHTML=`
+    <div class="sc"><div class="sl">Alpha Helix</div><div class="sv h">${percentages.H}%</div><div class="ss">${counts.H} residues</div></div>
+    <div class="sc"><div class="sl">Beta Sheet</div><div class="sv e">${percentages.E}%</div><div class="ss">${counts.E} residues</div></div>
+    <div class="sc"><div class="sl">Coil / Loop</div><div class="sv c">${percentages.C}%</div><div class="ss">${counts.C} residues</div></div>
+    <div class="sc"><div class="sl">Length</div><div class="sv" style="color:var(--txt)">${sequence.length}</div><div class="ss">amino acids</div></div>`;
+
+  /* Seq map */
+  renderSeqViz(per_residue,'');
+
+  /* Segments */
+  renderSegments(per_residue);
+
+  /* Charts */
+  [pieChart,barChart,lineChart].forEach(c=>c&&c.destroy());
+
+  pieChart=new Chart(document.getElementById('pieChart'),{
+    type:'doughnut',
+    data:{labels:['Alpha Helix','Beta Sheet','Coil'],
+      datasets:[{data:[counts.H,counts.E,counts.C],
+        backgroundColor:['rgba(0,229,255,.7)','rgba(106,255,142,.7)','rgba(255,107,53,.7)'],
+        borderColor:'#040912',borderWidth:3}]},
+    options:{cutout:'62%',plugins:{legend:{labels:{color:'#3d6080',font:{family:'JetBrains Mono',size:11}}}},animation:{duration:600}}
+  });
+
+  barChart=new Chart(document.getElementById('barChart'),{
+    type:'bar',
+    data:{labels:['Helix (H)','Sheet (E)','Coil (C)'],
+      datasets:[{label:'Count',data:[counts.H,counts.E,counts.C],
+        backgroundColor:['rgba(0,229,255,.55)','rgba(106,255,142,.55)','rgba(255,107,53,.55)'],borderRadius:0}]},
+    options:{plugins:{legend:{display:false}},
+      scales:{x:{ticks:{color:'#3d6080',font:{family:'JetBrains Mono',size:11}},grid:{color:'rgba(21,37,64,.5)'}},
+              y:{ticks:{color:'#3d6080',font:{family:'JetBrains Mono',size:11}},grid:{color:'rgba(21,37,64,.5)'}}},animation:{duration:600}}
+  });
+
+  const sl=per_residue.slice(0,80);
+  lineChart=new Chart(document.getElementById('lineChart'),{
+    type:'line',
+    data:{labels:sl.map(r=>r.position),
+      datasets:[
+        {label:'Helix', data:sl.map(r=>r.confidence.H),borderColor:'#00e5ff',backgroundColor:'rgba(0,229,255,.04)',tension:.38,fill:true,pointRadius:0,borderWidth:1.5},
+        {label:'Sheet', data:sl.map(r=>r.confidence.E),borderColor:'#6aff8e',backgroundColor:'rgba(106,255,142,.04)',tension:.38,fill:true,pointRadius:0,borderWidth:1.5},
+        {label:'Coil',  data:sl.map(r=>r.confidence.C),borderColor:'#ff6b35',backgroundColor:'rgba(255,107,53,.04)',tension:.38,fill:true,pointRadius:0,borderWidth:1.5}
+      ]},
+    options:{plugins:{legend:{labels:{color:'#3d6080',font:{family:'JetBrains Mono',size:11}}}},
+      scales:{x:{ticks:{color:'#3d6080',font:{family:'JetBrains Mono',size:10}},grid:{color:'rgba(21,37,64,.4)'}},
+              y:{min:0,max:1,ticks:{color:'#3d6080',font:{family:'JetBrains Mono',size:10}},grid:{color:'rgba(21,37,64,.4)'}}},animation:{duration:600}}
+  });
+
+  /* Heatmap */
+  drawHeatmap(per_residue);
+
+  /* Table */
+  renderTable(per_residue);
+
+  document.getElementById('results').style.display='block';
+  setTimeout(()=>{
+    buildThree(per_residue);
+    document.getElementById('results').scrollIntoView({behavior:'smooth',block:'start'});
+  },150);
+}
+
+/* ── Sequence Viz ── */
+function renderSeqViz(pr,filter){
+  const f=filter.toUpperCase();
+  const st=document.getElementById('seqStats');
+  const viz=document.getElementById('seqViz');
+  let shown=0;
+  viz.innerHTML=pr.map(r=>{
+    const hide=f&&(f.startsWith('#')?(r.structure!==f.slice(1)):(r.amino_acid!==f));
+    if(!hide) shown++;
+    const conf=Math.round(r.confidence[r.structure]*100);
+    return `<div class="rs ${r.structure}" style="${hide?'opacity:.12;filter:grayscale(1)':''}"
+      title="Pos ${r.position}: ${r.amino_acid} → ${r.structure_name} (${conf}%)">
+      <span class="raa">${r.amino_acid}</span>
+      <span class="rss">${r.structure}</span>
+    </div>`;
+  }).join('');
+  st.textContent=f?`Showing ${shown} of ${pr.length} residues`:'';
+}
+
+function filterResidues(){
+  if(!currentData) return;
+  currentFilter=document.getElementById('filterInput').value;
+  renderSeqViz(currentData.per_residue,currentFilter);
+}
+
+function filterByStruct(s){
+  if(!currentData) return;
+  document.getElementById('filterInput').value='';
+  renderSeqViz(currentData.per_residue,s?'#'+s:'');
+  document.getElementById('seqStats').textContent=s?`Showing only ${s==='H'?'Helix':s==='E'?'Sheet':'Coil'} residues`:'';
+}
+
+/* ── Segment detection ── */
+function renderSegments(pr){
+  const segs=[];
+  let cur=null;
+  pr.forEach(r=>{
+    if(!cur||cur.ss!==r.structure){
+      if(cur) segs.push(cur);
+      cur={ss:r.structure,start:r.position,seq:r.amino_acid,name:r.structure_name};
+    } else {
+      cur.seq+=r.amino_acid;
+    }
+  });
+  if(cur) segs.push(cur);
+
+  document.getElementById('segList').innerHTML=segs.map(s=>`
+    <div class="seg-item" title="Click to highlight in seq map">
+      <span class="seg-tag ${s.ss}">${s.ss} — ${s.name}</span>
+      <span class="seg-seq">${s.seq}</span>
+      <span class="seg-pos">pos ${s.start}–${s.start+s.seq.length-1} &nbsp; (${s.seq.length} aa)</span>
+    </div>`).join('');
+}
+
+/* ── Heatmap ── */
+function drawHeatmap(pr){
+  const canvas=document.getElementById('hmCanvas');
+  const dpr=window.devicePixelRatio||1;
+  const W=canvas.parentElement.clientWidth||800;
+  const H=80;
+  canvas.width=W*dpr; canvas.height=H*dpr;
+  canvas.style.width=W+'px'; canvas.style.height=H+'px';
+  const ctx=canvas.getContext('2d');
+  ctx.scale(dpr,dpr);
+
+  const n=pr.length;
+  const bw=Math.max(1,W/n);
+
+  /* row 1: H confidence */
+  pr.forEach((r,i)=>{
+    const v=r.confidence.H;
+    ctx.fillStyle=`rgba(0,229,255,${v})`;
+    ctx.fillRect(i*bw,0,bw,26);
+  });
+  /* row 2: E confidence */
+  pr.forEach((r,i)=>{
+    const v=r.confidence.E;
+    ctx.fillStyle=`rgba(106,255,142,${v})`;
+    ctx.fillRect(i*bw,27,bw,26);
+  });
+  /* row 3: C confidence */
+  pr.forEach((r,i)=>{
+    const v=r.confidence.C;
+    ctx.fillStyle=`rgba(255,107,53,${v})`;
+    ctx.fillRect(i*bw,54,bw,26);
+  });
+
+  /* Labels */
+  ctx.font='10px JetBrains Mono,monospace';
+  ctx.fillStyle='rgba(61,96,128,.9)';
+  ctx.fillText('H',W-22,18);
+  ctx.fillText('E',W-22,44);
+  ctx.fillText('C',W-22,70);
+}
+
+/* ── Sort table ── */
+function sortTable(key){
+  if(!currentData) return;
+  sortDir[key]=(sortDir[key]||1)*-1;
+  const pr=[...currentData.per_residue].sort((a,b)=>{
+    if(key==='position') return sortDir[key]*(a.position-b.position);
+    if(key==='structure') return sortDir[key]*a.structure.localeCompare(b.structure);
+    if(key==='confidence') return sortDir[key]*(b.confidence[b.structure]-a.confidence[a.structure]);
+    return 0;
+  });
+  renderTable(pr);
+}
+
+function renderTable(pr){
+  document.getElementById('resTbl').innerHTML=pr.map(r=>{
+    const top=r.confidence[r.structure];
+    return `<tr>
+      <td style="color:var(--mut)">${r.position}</td>
+      <td style="font-weight:600;color:var(--txt)">${r.amino_acid}</td>
+      <td><span class="tag ${r.structure}">${r.structure} — ${r.structure_name}</span></td>
+      <td style="color:var(--H)">${(r.confidence.H*100).toFixed(1)}%</td>
+      <td style="color:var(--E)">${(r.confidence.E*100).toFixed(1)}%</td>
+      <td style="color:var(--C)">${(r.confidence.C*100).toFixed(1)}%</td>
+      <td><div class="cb"><div class="cbr"><div class="cbf ${r.structure}" style="width:${Math.round(top*100)}%"></div></div>
+        <span style="color:var(--mut);font-size:10px">${Math.round(top*100)}%</span></div></td>
+    </tr>`;
+  }).join('');
+}
+
+/* ════════════════════════════ EXPORT ════════════════════════════ */
+function exportCSV(){
+  if(!currentData) return;
+  const h='Position,AminoAcid,Structure,StructureName,H_conf,E_conf,C_conf\n';
+  const rows=currentData.per_residue.map(r=>
+    `${r.position},${r.amino_acid},${r.structure},${r.structure_name},${r.confidence.H},${r.confidence.E},${r.confidence.C}`
+  ).join('\n');
+  download('protein_structure.csv','text/csv',h+rows);
+}
+
+function exportFASTA(){
+  if(!currentData) return;
+  const seq='>Predicted_Structure\n'+currentData.structure;
+  const aa='>Sequence\n'+currentData.sequence;
+  download('protein_structure.fasta','text/plain',aa+'\n\n'+seq);
+}
+
+function copyJSON(){
+  if(!currentData) return;
+  navigator.clipboard.writeText(JSON.stringify(currentData,null,2))
+    .then(()=>alert('JSON copied to clipboard!'));
+}
+
+function exportPNG(){
+  const c=document.getElementById('hmCanvas');
+  const a=document.createElement('a');
+  a.href=c.toDataURL('image/png');
+  a.download='protein_heatmap.png';
+  a.click();
+}
+
+function download(name,mime,content){
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([content],{type:mime}));
+  a.download=name; a.click();
+}
+
+/* ════════════════════════════ THREE.JS ════════════════════════════ */
+let renderer=null,scene=null,camera=null,animId=null;
+let raycaster=null,mouse3=null;
+let resMeshes=[];
+let autoSpin=false,curMode='ball';
+let isDrag=false,pm={x:0,y:0};
+let sTheta=0.3,sPhi=1.2,sRadius=45;
+let tTheta=0.3,tPhi=1.2;
+
+const CH=new THREE.Color(0x00e5ff),CE=new THREE.Color(0x6aff8e),CC=new THREE.Color(0xff6b35);
+const EH=new THREE.Color(0x002233),EE=new THREE.Color(0x00220e),EC=new THREE.Color(0x221100);
+function gc(ss){return ss==='H'?CH:ss==='E'?CE:CC}
+function ge(ss){return ss==='H'?EH:ss==='E'?EE:EC}
+
+function disposeThree(){
+  if(animId) cancelAnimationFrame(animId);
+  if(renderer){
+    const c=document.getElementById('tc');
+    ['mousedown','mousemove','mouseup','wheel'].forEach(e=>c.removeEventListener(e,handlers[e]));
+    renderer.dispose();
+  }
+  renderer=scene=camera=null; resMeshes=[];
+}
+
+function genCoords(pr){
+  const out=[];let x=0,y=0,z=0,ha=0;
+  const HR=1.8,HR2=1.1,HT=Math.PI*2/3.6;
+  for(let i=0;i<pr.length;i++){
+    const r=pr[i];
+    if(r.structure==='H'){ha+=HT;x=HR*Math.cos(ha);z=HR*Math.sin(ha);y+=HR2;}
+    else if(r.structure==='E'){ha=0;x+=1.4;z+=(i%2?.25:-.25);y+=.06;}
+    else{ha=0;const a=i*1.15;x+=1+Math.sin(a)*.5;y+=.5+Math.cos(a*.7)*.28;z+=Math.sin(a*1.3)*.5;}
+    out.push({x,y,z,res:r});
+  }
+  let cx=0,cy=0,cz=0;
+  out.forEach(c=>{cx+=c.x;cy+=c.y;cz+=c.z;});
+  cx/=out.length;cy/=out.length;cz/=out.length;
+  out.forEach(c=>{c.x-=cx;c.y-=cy;c.z-=cz;});
+  return out;
+}
+
+function mkMat(ss,t,o){return new THREE.MeshPhongMaterial({color:gc(ss),emissive:ge(ss),shininess:90,transparent:t,opacity:t?o:1})}
+
+function addCyl(a,b,ss,r){
+  const dir=new THREE.Vector3(b.x-a.x,b.y-a.y,b.z-a.z);
+  const len=dir.length();
+  const mid=new THREE.Vector3((a.x+b.x)/2,(a.y+b.y)/2,(a.z+b.z)/2);
+  const g=new THREE.CylinderGeometry(r,r,len,10,1);
+  const m=new THREE.Mesh(g,mkMat(ss,false,1));
+  m.position.copy(mid);
+  m.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),dir.normalize());
+  m.userData={isBond:true};
+  scene.add(m);
+}
+
+function buildMode(coords,mode){
+  scene.children.filter(c=>c.userData.isBond||c.userData.isRes).forEach(c=>scene.remove(c));
+  resMeshes=[];
+  if(mode==='ball'||mode==='sphere'){
+    const br=mode==='sphere'?1.1:.55;
+    coords.forEach((c)=>{
+      const conf=c.res.confidence[c.res.structure];
+      const r=mode==='sphere'?br:br*(.55+conf*.9);
+      const g=new THREE.SphereGeometry(r,16,12);
+      const m=new THREE.Mesh(g,mkMat(c.res.structure,mode==='sphere',.82));
+      m.position.set(c.x,c.y,c.z);
+      m.userData={res:c.res,isRes:true};
+      scene.add(m);resMeshes.push(m);
+    });
+    if(mode==='ball') for(let i=0;i<coords.length-1;i++) addCyl(coords[i],coords[i+1],coords[i].res.structure,.12);
+  }
+  if(mode==='ribbon'){
+    for(let i=0;i<coords.length-1;i++) addCyl(coords[i],coords[i+1],coords[i].res.structure,.38);
+    coords.forEach((c,i)=>{
+      if(i===0||i===coords.length-1||(i>0&&coords[i-1].res.structure!==c.res.structure)){
+        const m=new THREE.Mesh(new THREE.SphereGeometry(.52,12,10),mkMat(c.res.structure,false,1));
+        m.position.set(c.x,c.y,c.z);m.userData={res:c.res,isRes:true};scene.add(m);resMeshes.push(m);
+      } else {
+        const m=new THREE.Mesh(new THREE.SphereGeometry(.3,6,5),new THREE.MeshBasicMaterial({transparent:true,opacity:0}));
+        m.position.set(c.x,c.y,c.z);m.userData={res:c.res,isRes:true,invis:true};scene.add(m);resMeshes.push(m);
+      }
+    });
+  }
+}
+
+const handlers={};
+
+function buildThree(pr){
+  disposeThree();
+  const canvas=document.getElementById('tc');
+  const W=canvas.clientWidth,H=500;
+  renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true});
+  renderer.setSize(W,H,false);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+  renderer.setClearColor(0,0);
+  scene=new THREE.Scene();
+  camera=new THREE.PerspectiveCamera(45,W/H,.1,500);
+  scene.add(new THREE.AmbientLight(0xffffff,.3));
+  const d1=new THREE.DirectionalLight(0x00e5ff,.9);d1.position.set(10,20,10);scene.add(d1);
+  const d2=new THREE.DirectionalLight(0xff6b35,.4);d2.position.set(-10,-10,-5);scene.add(d2);
+  const p1=new THREE.PointLight(0x6aff8e,.7,80);p1.position.set(0,0,25);scene.add(p1);
+  raycaster=new THREE.Raycaster();mouse3=new THREE.Vector2();
+  buildMode(genCoords(pr),curMode);
+
+  handlers.mousedown=e=>{isDrag=true;pm={x:e.clientX,y:e.clientY}};
+  handlers.mouseup=()=>{isDrag=false};
+  handlers.mousemove=e=>{
+    if(isDrag){tTheta-=(e.clientX-pm.x)*.008;tPhi=Math.max(.15,Math.min(Math.PI-.15,tPhi+(e.clientY-pm.y)*.008));pm={x:e.clientX,y:e.clientY};return;}
+    const rect=canvas.getBoundingClientRect();
+    mouse3.x=((e.clientX-rect.left)/rect.width)*2-1;
+    mouse3.y=((e.clientY-rect.top)/rect.height)*-2+1;
+    raycaster.setFromCamera(mouse3,camera);
+    const hits=raycaster.intersectObjects(resMeshes.filter(m=>!m.userData.invis));
+    if(hits.length>0){
+      const r=hits[0].object.userData.res;
+      if(r){
+        document.getElementById('tp').textContent=r.position;
+        document.getElementById('ta').textContent=r.amino_acid;
+        const ts=document.getElementById('ts2');ts.className='tv '+r.structure;ts.textContent=r.structure+' — '+r.structure_name;
+        document.getElementById('tc2').textContent=Math.round(r.confidence[r.structure]*100)+'%';
+        const tt=document.getElementById('tooltip');
+        tt.style.display='block';tt.style.left=(e.clientX-rect.left+16)+'px';tt.style.top=(e.clientY-rect.top-10)+'px';
+      }
+    } else {document.getElementById('tooltip').style.display='none';}
+  };
+  handlers.wheel=e=>{sRadius=Math.max(8,Math.min(130,sRadius+e.deltaY*.045))};
+  canvas.addEventListener('mousedown',handlers.mousedown);
+  canvas.addEventListener('mousemove',handlers.mousemove);
+  canvas.addEventListener('mouseup',handlers.mouseup);
+  canvas.addEventListener('mouseleave',()=>{isDrag=false;document.getElementById('tooltip').style.display='none';});
+  canvas.addEventListener('wheel',handlers.wheel,{passive:true});
+  window.addEventListener('resize',()=>{if(!renderer)return;const nw=canvas.clientWidth;renderer.setSize(nw,H,false);camera.aspect=nw/H;camera.updateProjectionMatrix();});
+  animate();
+}
+
+function setMode(m){
+  if(!currentData)return;
+  curMode=m;
+  ['ball','ribbon','sphere'].forEach(x=>document.getElementById('btn'+x.charAt(0).toUpperCase()+x.slice(1)).classList.toggle('active',x===m));
+  buildMode(genCoords(currentData.per_residue),m);
+}
+function resetCam(){tTheta=.3;tPhi=1.2;sRadius=45;}
+function toggleSpin(){autoSpin=!autoSpin;document.getElementById('btnSpin').classList.toggle('active',autoSpin);}
+
+function animate(){
+  animId=requestAnimationFrame(animate);
+  if(!renderer||!scene||!camera)return;
+  sTheta+=(tTheta-sTheta)*.07;sPhi+=(tPhi-sPhi)*.07;
+  if(autoSpin)tTheta+=.005;
+  camera.position.set(sRadius*Math.sin(sPhi)*Math.sin(sTheta),sRadius*Math.cos(sPhi),sRadius*Math.sin(sPhi)*Math.cos(sTheta));
+  camera.lookAt(0,0,0);
+  renderer.render(scene,camera);
+}
+
+document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key==='Enter')runPrediction();});
+</script>
+</body>
+</html>
