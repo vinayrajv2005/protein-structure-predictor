@@ -153,10 +153,64 @@
     footer{margin-top:56px;border-top:1px solid var(--bd);padding-top:22px;font-family:var(--fm);font-size:11px;color:var(--mut);display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px}
     @keyframes fup{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
     .fi{animation:fup .5s ease forwards}
+
+    /* ══ TAB NAV ══ */
+    .tab-nav{display:flex;gap:0;border-bottom:2px solid var(--bd);margin-top:0}
+    .tnb{font-family:var(--fm);font-size:11px;letter-spacing:2px;text-transform:uppercase;background:none;border:none;color:var(--mut);padding:11px 22px;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .2s}
+    .tnb:hover{color:var(--txt)}
+    .tnb.active{color:var(--acc);border-bottom-color:var(--acc)}
+    .panel{display:none}
+    .panel.active{display:block}
+    /* ══ MUTATION STYLES ══ */
+    .mut-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:18px}
+    @media(max-width:600px){.mut-grid{grid-template-columns:1fr}}
+    .mut-field{display:flex;flex-direction:column}
+    label.fl{font-family:var(--fm);font-size:10px;letter-spacing:1.5px;color:var(--mut);text-transform:uppercase;display:block;margin-bottom:6px}
+    input[type="number"],select{background:var(--bg);border:1px solid var(--bd);color:var(--txt);font-family:var(--fm);font-size:13px;padding:8px 12px;outline:none;transition:border-color .2s;width:100%}
+    input:focus,select:focus{border-color:var(--acc)}
+    .risk-badge{display:inline-block;padding:3px 11px;font-family:var(--fm);font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase}
+    .risk-High{background:rgba(255,61,113,.15);color:#ff6b9d;border:1px solid #ff3d71}
+    .risk-Moderate{background:rgba(255,204,68,.1);color:#ffcc44;border:1px solid #ffcc44}
+    .risk-Low{background:rgba(0,229,255,.1);color:var(--acc);border:1px solid var(--acc)}
+    .prob-wrap{margin:16px 0 6px}
+    .prob-track{height:12px;background:var(--bg);border:1px solid var(--bd);overflow:hidden}
+    .prob-fill{height:100%;transition:width .7s ease}
+    .prob-fill.patho{background:linear-gradient(90deg,#ff3d71,#ff6b9d)}
+    .prob-fill.benign{background:linear-gradient(90deg,var(--acc),#00b8cc)}
+    .prob-labels{display:flex;justify-content:space-between;font-family:var(--fm);font-size:10px;color:var(--mut);margin-top:4px}
+    .det-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:18px}
+    @media(max-width:500px){.det-grid{grid-template-columns:1fr}}
+    .det-item{background:var(--s2);border:1px solid var(--bd);padding:14px}
+    .det-k{font-family:var(--fm);font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--mut)}
+    .det-v{font-size:1.4rem;font-weight:800;margin-top:4px;color:var(--txt)}
+    .interp{border-left:3px solid #a259ff;padding:12px 16px;font-family:var(--fm);font-size:12px;line-height:1.7;color:var(--mut);margin-top:16px;background:rgba(162,89,255,.04)}
+    .mut-headline{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:10px}
+    .mut-lbl{font-size:1.8rem;font-weight:800;letter-spacing:-0.5px}
+    .blosum-pos{color:var(--E)}.blosum-neg{color:var(--C)}.blosum-zer{color:var(--mut)}
+    .scan-tbl{width:100%;border-collapse:collapse;font-family:var(--fm);font-size:12px}
+    .scan-tbl th{background:var(--s3);color:var(--mut);text-transform:uppercase;letter-spacing:1px;font-size:10px;padding:9px 12px;text-align:left;border-bottom:1px solid var(--bd)}
+    .scan-tbl td{padding:7px 12px;border-bottom:1px solid rgba(21,37,64,.5)}
+    .scan-tbl tr:hover td{background:rgba(0,229,255,.02)}
+    .mini-bar{display:flex;align-items:center;gap:7px}
+    .mini-track{width:55px;height:4px;background:var(--bg)}
+    .mini-fill{height:100%}
+    .demo-banner{background:rgba(162,89,255,.1);border:1px solid #a259ff;font-family:var(--fm);font-size:12px;color:#a259ff;padding:8px 14px;margin-bottom:16px;display:none}
+    .err-banner{background:rgba(255,107,53,.08);border:1px solid var(--C);font-family:var(--fm);font-size:12px;color:var(--C);padding:8px 14px;margin-bottom:16px;display:none}
   </style>
 </head>
 <body>
 <div class="wrap">
+
+
+  <!-- Tab navigation -->
+  <div class="tab-nav">
+    <button class="tnb active" onclick="switchTab('structure',this)">⬡ &nbsp;Structure</button>
+    <button class="tnb" onclick="switchTab('mutation',this)">⚠ &nbsp;Mutation Risk</button>
+    <button class="tnb" onclick="switchTab('scan',this)">⟳ &nbsp;Hotspot Scan</button>
+  </div>
+
+  <!-- Tab 1 wrapper start -->
+  <div id="tab-structure" class="panel active">
 
   <header>
     <div class="badge">AI · BIOINFORMATICS · DEEP LEARNING</div>
@@ -287,6 +341,86 @@
     </div>
 
   </div><!-- /results -->
+
+  </div><!-- /tab-structure -->
+
+  <!-- TAB 2 — MUTATION DISEASE PREDICTION -->
+  <div id="tab-mutation" class="panel">
+    <div class="card" style="margin-top:40px">
+      <div class="clbl">// Point Mutation Input</div>
+      <p style="font-family:var(--fm);font-size:12px;color:var(--mut);line-height:1.7;margin-bottom:18px">
+        Enter the wild-type amino acid, the mutant amino acid, and its position in the protein. The model predicts whether this substitution is <span style="color:var(--C)">pathogenic (disease-causing)</span> or <span style="color:var(--acc)">benign</span>.
+      </p>
+      <div class="mut-grid">
+        <div class="mut-field"><label class="fl">Reference (Wild-type) AA</label><select id="mut-ref"></select></div>
+        <div class="mut-field"><label class="fl">Alternate (Mutant) AA</label><select id="mut-alt"></select></div>
+        <div class="mut-field"><label class="fl">Position (1-based)</label><input type="number" id="mut-pos" min="1" value="42"/></div>
+      </div>
+      <div class="mut-grid" style="grid-template-columns:1fr 2fr">
+        <div class="mut-field"><label class="fl">Protein Length</label><input type="number" id="mut-plen" min="1" value="300"/></div>
+      </div>
+      <div class="row">
+        <button class="btn bp" onclick="runMutation()">Predict Pathogenicity</button>
+        <button class="btn bs" onclick="loadMutDemo()">Load Example</button>
+      </div>
+      <div class="st" id="mut-status"></div>
+    </div>
+    <div class="demo-banner" id="mut-demo">⚠ Demo mode — train mutation_model.pt for real AI predictions</div>
+    <div class="err-banner" id="mut-err"></div>
+    <div class="card fi" id="mut-result" style="display:none;margin-top:0">
+      <div class="clbl">// Mutation Analysis Result</div>
+      <div class="mut-headline">
+        <span class="mut-lbl" id="mut-pred-label"></span>
+        <span class="risk-badge" id="mut-risk-badge"></span>
+      </div>
+      <label class="fl">Pathogenicity Probability</label>
+      <div class="prob-wrap">
+        <div class="prob-track"><div class="prob-fill" id="prob-fill"></div></div>
+        <div class="prob-labels"><span>Benign (0%)</span><span id="prob-pct" style="color:var(--txt);font-weight:600"></span><span>Pathogenic (100%)</span></div>
+      </div>
+      <div class="det-grid">
+        <div class="det-item"><div class="det-k">Substitution</div><div class="det-v" id="det-sub"></div></div>
+        <div class="det-item"><div class="det-k">BLOSUM62 Score</div><div class="det-v" id="det-blosum"></div></div>
+        <div class="det-item"><div class="det-k">Confidence</div><div class="det-v" id="det-conf"></div></div>
+        <div class="det-item"><div class="det-k">Position</div><div class="det-v" id="det-pos"></div></div>
+      </div>
+      <div class="interp" id="mut-interp"></div>
+    </div>
+  </div>
+
+  <!-- TAB 3 — HOTSPOT SCAN -->
+  <div id="tab-scan" class="panel">
+    <div class="card" style="margin-top:40px">
+      <div class="clbl">// Mutation Hotspot Scanner</div>
+      <p style="font-family:var(--fm);font-size:12px;color:var(--mut);line-height:1.7;margin-bottom:16px">
+        Tests every possible single amino acid substitution across your sequence and ranks them by predicted pathogenicity — identify mutation hotspots and vulnerable positions.
+      </p>
+      <label class="fl">Protein Sequence (max 200 AA)</label>
+      <textarea id="scan-seq" style="min-height:75px" placeholder="e.g. ACDEFGHIKLM..."></textarea>
+      <div style="display:flex;align-items:flex-end;gap:16px;margin-top:12px;flex-wrap:wrap">
+        <div style="display:flex;flex-direction:column;width:140px">
+          <label class="fl">Top N results</label>
+          <input type="number" id="scan-topn" value="15" min="1" max="50"/>
+        </div>
+      </div>
+      <div class="row">
+        <button class="btn bp" onclick="runScan()">Scan Sequence</button>
+        <button class="btn bs" onclick="document.getElementById('scan-seq').value='ACDEFGHIKLM'">Demo Seq</button>
+      </div>
+      <div class="st" id="scan-status"></div>
+    </div>
+    <div class="err-banner" id="scan-err"></div>
+    <div class="card fi" id="scan-result" style="display:none;margin-top:0">
+      <div class="clbl">// Top Pathogenic Mutations</div>
+      <div style="font-family:var(--fm);font-size:11px;color:var(--mut);margin-bottom:14px" id="scan-summary"></div>
+      <div style="overflow-x:auto">
+        <table class="scan-tbl">
+          <thead><tr><th>Pos</th><th>Ref → Alt</th><th>Prediction</th><th>Probability</th><th>BLOSUM62</th><th>Risk</th></tr></thead>
+          <tbody id="scan-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
 
   <footer>
     <span>ProteinAI — BiLSTM Secondary Structure Predictor</span>
@@ -734,6 +868,125 @@ function animate(){
 }
 
 document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key==='Enter')runPrediction();});
+
+/* ════ MUTATION TAB ════ */
+const AA_LIST=[
+  {c:'A',n:'Alanine'},{c:'C',n:'Cysteine'},{c:'D',n:'Aspartate'},{c:'E',n:'Glutamate'},
+  {c:'F',n:'Phenylalanine'},{c:'G',n:'Glycine'},{c:'H',n:'Histidine'},{c:'I',n:'Isoleucine'},
+  {c:'K',n:'Lysine'},{c:'L',n:'Leucine'},{c:'M',n:'Methionine'},{c:'N',n:'Asparagine'},
+  {c:'P',n:'Proline'},{c:'Q',n:'Glutamine'},{c:'R',n:'Arginine'},{c:'S',n:'Serine'},
+  {c:'T',n:'Threonine'},{c:'V',n:'Valine'},{c:'W',n:'Tryptophan'},{c:'Y',n:'Tyrosine'},
+];
+['mut-ref','mut-alt'].forEach(id=>{
+  const sel=document.getElementById(id);
+  AA_LIST.forEach(aa=>{
+    const opt=document.createElement('option');
+    opt.value=aa.c;opt.textContent=`${aa.c} — ${aa.n}`;sel.appendChild(opt);
+  });
+});
+document.getElementById('mut-ref').value='A';
+document.getElementById('mut-alt').value='V';
+
+function loadMutDemo(){
+  document.getElementById('mut-ref').value='C';
+  document.getElementById('mut-alt').value='R';
+  document.getElementById('mut-pos').value='128';
+  document.getElementById('mut-plen').value='400';
+}
+
+function showBanner(id,msg){const el=document.getElementById(id);el.textContent='⚠ '+msg;el.style.display='block';}
+function hideBanner(id){document.getElementById(id).style.display='none';}
+
+function setMutSt(msg,type=''){const el=document.getElementById('mut-status');el.className='st '+type;el.innerHTML=msg;}
+
+async function runMutation(){
+  hideBanner('mut-err');hideBanner('mut-demo');
+  document.getElementById('mut-result').style.display='none';
+  const ref=document.getElementById('mut-ref').value;
+  const alt=document.getElementById('mut-alt').value;
+  const pos=parseInt(document.getElementById('mut-pos').value);
+  const plen=parseInt(document.getElementById('mut-plen').value)||500;
+  if(!ref||!alt){showBanner('mut-err','Select both amino acids.');return;}
+  if(ref===alt){showBanner('mut-err','Reference and alternate must differ.');return;}
+  if(!pos||pos<1){showBanner('mut-err','Enter a valid position (>=1).');return;}
+  setMutSt('<span class="sp"></span> Analyzing mutation…','ld2');
+  try{
+    const data=await postJSON('/predict_mutation',{ref_aa:ref,alt_aa:alt,position:pos,protein_length:plen});
+    setMutSt('');
+    if(data.error){showBanner('mut-err',data.error);return;}
+    if(data.demo_mode) document.getElementById('mut-demo').style.display='block';
+    renderMutation(data);
+  }catch(e){setMutSt('⚠ Server error: '+e.message,'err');}
+}
+
+function renderMutation(d){
+  const isP=d.prediction==='Pathogenic';
+  const pct=Math.round(d.probability*100);
+  const lbl=document.getElementById('mut-pred-label');
+  lbl.textContent=isP?'⚠ Pathogenic':'✓ Benign';
+  lbl.style.color=isP?'var(--C)':'var(--acc)';
+  const rb=document.getElementById('mut-risk-badge');
+  rb.textContent=d.risk_level+' Risk';rb.className='risk-badge risk-'+d.risk_level;
+  document.getElementById('prob-fill').style.width=pct+'%';
+  document.getElementById('prob-fill').className='prob-fill '+(isP?'patho':'benign');
+  document.getElementById('prob-pct').textContent=pct+'%';
+  document.getElementById('det-sub').textContent=d.ref_aa+' → '+d.alt_aa;
+  const bl=document.getElementById('det-blosum');
+  bl.textContent=d.blosum_score;bl.className='det-v '+(d.blosum_score>0?'blosum-pos':d.blosum_score<0?'blosum-neg':'blosum-zer');
+  document.getElementById('det-conf').textContent=(d.confidence*100).toFixed(0)+'%';
+  document.getElementById('det-pos').textContent='Position '+d.position;
+  document.getElementById('mut-interp').textContent=d.interpretation;
+  document.getElementById('mut-result').style.display='block';
+}
+
+/* ════ SCAN TAB ════ */
+function riskColor(r){return{High:'var(--C)',Moderate:'#ffcc44',Low:'var(--acc)'}[r]||'#aaa';}
+
+async function runScan(){
+  hideBanner('scan-err');
+  document.getElementById('scan-result').style.display='none';
+  const seq=document.getElementById('scan-seq').value.trim().toUpperCase();
+  const topn=parseInt(document.getElementById('scan-topn').value)||15;
+  if(!seq){showBanner('scan-err','Please enter a sequence.');return;}
+  const st=document.getElementById('scan-status');
+  st.className='st ld2';st.innerHTML='<span class="sp"></span> Scanning all substitutions…';
+  try{
+    const data=await postJSON('/scan_sequence',{sequence:seq,top_n:topn});
+    st.textContent='';
+    if(data.error){showBanner('scan-err',data.error);return;}
+    renderScan(data);
+  }catch(e){st.className='st err';st.textContent='⚠ Server error: '+e.message;}
+}
+
+function renderScan(data){
+  document.getElementById('scan-summary').textContent=`Scanned ${data.total_scanned} possible mutations across ${data.sequence.length} positions. Showing top ${data.top_hits.length} by pathogenicity probability.`;
+  document.getElementById('scan-tbody').innerHTML=data.top_hits.map(h=>`
+    <tr>
+      <td style="color:var(--mut)">${h.position}</td>
+      <td style="font-weight:700;color:var(--txt)">${h.ref_aa} → ${h.alt_aa}</td>
+      <td style="color:${h.prediction==='Pathogenic'?'var(--C)':'var(--acc)'}">${h.prediction}</td>
+      <td><div class="mini-bar"><div class="mini-track"><div class="mini-fill" style="width:${Math.round(h.probability*100)}%;background:${riskColor(h.risk_level)}"></div></div><span>${(h.probability*100).toFixed(1)}%</span></div></td>
+      <td style="color:${h.blosum_score<0?'var(--C)':h.blosum_score>0?'var(--E)':'var(--mut)'}">${h.blosum_score}</td>
+      <td style="color:${riskColor(h.risk_level)}">${h.risk_level}</td>
+    </tr>`).join('');
+  document.getElementById('scan-result').style.display='block';
+}
+
+/* ════ SHARED ════ */
+async function postJSON(url,body){
+  const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  return r.json();
+}
+
+/* ════ TAB SWITCHING ════ */
+function switchTab(name,btn){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tnb').forEach(b=>b.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  btn.classList.add('active');
+  if(name==='structure'&&currentData) setTimeout(()=>buildThree(currentData.per_residue),100);
+}
+
 </script>
 </body>
 </html>
